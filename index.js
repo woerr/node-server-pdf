@@ -61,7 +61,8 @@ var queryCreatePdf = function(req, res, next) {
   if(req.params.cfg) cfg = JSON.parse(req.params.cfg);
 
   var pdfCreator = new PdfCreator();
-  pdfCreator.create({html:req.formData.html})
+  var formData = req.formData || {};
+  pdfCreator.create({html:formData.html||''})
   // pdfCreator.create({html:'<div>Test html <span>по русски</span></div>'})
     .then(function(pdf){
       // pdf.path = pdf.path.replace('./','');
