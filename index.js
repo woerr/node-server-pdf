@@ -114,7 +114,7 @@ PdfCreator.prototype.create = function(cfg){
   var html = cfg.html||'';
   var marginLeft = cfg.marginLeft || '12mm';
   var marginTop = cfg.marginTop || '12mm';
-  var marginRight = cfg.marginRight || '0mm';
+  var marginRight = cfg.marginRight || '8mm';
   var orientation = cfg.orientation || 'landscape';
   var encoding = cfg.encoding || 'utf-8';
 
