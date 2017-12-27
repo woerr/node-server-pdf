@@ -1,6 +1,5 @@
 var app = require('express')(),
   // bodyParser = require('body-parser'),
-  // upload = multer({ dest: 'uploads/' }),
   mkdirp = require('mkdirp'),
   http = require('http').Server(app),
   server,
@@ -9,6 +8,12 @@ var app = require('express')(),
   // JSZip = require('jszip');
 
 const path = require('path');
+
+var cfg = {
+  saveDir: "/documents/pdf/",
+  fullSaveDir: __dirname+"/documents/pdf/",
+};
+
 
 /**
  * Парсер formData (не сделан парсинг файлов, скорее всего будет падать из-за нехватки оперы)
@@ -66,7 +71,8 @@ var queryCreatePdf = function(req, res, next) {
   // pdfCreator.create({html:'<div>Test html <span>по русски</span></div>'})
     .then(function(pdf){
       // pdf.path = pdf.path.replace('./','');
-      res.redirect(301, req.protocol + '://' + req.get('host')+'/getPdf/'+path.basename(pdf.path));
+      // res.send(pdf);
+      res.redirect(req.protocol + '://' + req.get('host')+'/getPdf/'+path.basename(pdf.path));
       // res.sendFile(pdf.path, {root: __dirname});
     })
     .catch(function(e){
@@ -75,7 +81,7 @@ var queryCreatePdf = function(req, res, next) {
 };
 var queryGetPdf = function(req, res, next) {
   var fileName = req.params.filename;
-  var dir = '/documents/pdf/documentation/';
+  var dir = cfg.saveDir;
   var path = dir+fileName;
   res.sendFile(path, {root: __dirname});
 };
@@ -98,7 +104,8 @@ PdfCreator.prototype.init = function(cfg){
   var pdfCreator = this;
   pdfCreator.cfg = cfg;
   pdfCreator.complete = cfg.complete || function () {};
-  pdfCreator.saveDir  = cfg.saveDir || "/documents";
+  pdfCreator.saveDir  = cfg.saveDir || "/documents/pdf/";
+  pdfCreator.fullSaveDir  = cfg.saveDir || __dirname+"/documents/pdf/";
   pdfCreator.type = cfg.type || 'pdf';
   return pdfCreator;
 };
@@ -112,20 +119,20 @@ PdfCreator.prototype.create = function(cfg){
   var orientation = cfg.orientation || 'landscape';
   var encoding = cfg.encoding || 'utf-8';
 
-  var userStyleSheet = cfg.userStyleSheet;
+  // var userStyleSheet = cfg.userStyleSheet;
 
   var curentDateTime = new Date();
   var mlsec = curentDateTime.getMilliseconds();
   var sec = curentDateTime.getHours();
   var min = curentDateTime.getMinutes();
   var hour = curentDateTime.getHours();
-  var dir = cfg.dir || '.'+pdfCreator.saveDir+'/pdf/documentation/';
-  mkdirp(dir,function(e){if(e)console.log(e)});
-  var path = cfg.path || dir+mlsec+''+sec+''+min+''+hour+'.pdf';
+  mkdirp(pdfCreator.fullSaveDir,function(e){if(e)console.log(e)});
+  var fileName = mlsec+''+sec+''+min+''+hour+'.pdf';
+  var path = cfg.path || pdfCreator.fullSaveDir+fileName;
 
   return new Promise(function(resolve, reject){
     wkhtmltopdf(html, {
-      userStyleSheet: userStyleSheet,
+      // userStyleSheet: userStyleSheet,
       output: path,
       encoding: encoding,
       orientation: orientation,
@@ -133,7 +140,13 @@ PdfCreator.prototype.create = function(cfg){
       marginTop: marginTop,
       marginRight: marginRight
     }, function (e){
-      resolve({path:path,error:e});
+      resolve({
+        saveDir:pdfCreator.saveDir,
+        fullSaveDir:pdfCreator.fullSaveDir,
+        path:path,
+        fileName:fileName,
+        error:e
+      });
     });
   });
 };
