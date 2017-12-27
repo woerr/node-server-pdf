@@ -97,7 +97,6 @@ PdfCreator.prototype.init = function(cfg){
   cfg = cfg || {};
   var pdfCreator = this;
   pdfCreator.cfg = cfg;
-  // pdfCreator.res = cfg.res;
   pdfCreator.complete = cfg.complete || function () {};
   pdfCreator.saveDir  = cfg.saveDir || "/documents";
   pdfCreator.type = cfg.type || 'pdf';
@@ -124,22 +123,15 @@ PdfCreator.prototype.create = function(cfg){
   mkdirp(dir,function(e){if(e)console.log(e)});
   var path = cfg.path || dir+mlsec+''+sec+''+min+''+hour+'.pdf';
 
-  var enableJavascript = cfg.enableJavascript || false;
-  var disableJavascript = cfg.disableJavascript || true;
-  var noStopSlowScripts = cfg.noStopSlowScripts || true;
-
   return new Promise(function(resolve, reject){
     wkhtmltopdf(html, {
-      enableJavascript: enableJavascript,
-      disableJavascript: disableJavascript,
       userStyleSheet: userStyleSheet,
       output: path,
       encoding: encoding,
       orientation: orientation,
       marginLeft: marginLeft,
       marginTop: marginTop,
-      marginRight: marginRight,
-      noStopSlowScripts: noStopSlowScripts
+      marginRight: marginRight
     }, function (e){
       resolve({path:path,error:e});
     });
