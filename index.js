@@ -32,14 +32,13 @@ var formDataParse = function(req, res, next){
     req.setEncoding('utf8');
 
     var parse = function(rawBody){
-
       var reBody = new RegExp('--'+boundary+'-{0,2}');
-      var reName = /[\s\r\n]*name="([a-z0-9_-]*)"[\s\r\n]+(.*)[\s\r\n]+/i;
+      var reName = /(?:Content-Disposition:\s*form-data;)*[\s\r\n]*name="([a-z0-9_-]*)"/i;
       var _bodyes = (''+rawBody).split(reBody);
       req.formData = {};
       for(var item in _bodyes){
         var _body = (''+_bodyes[item]).match(reName);
-        if(_body && _body[1]) req.formData[_body[1]]=_body[2];
+        if(_body && _body[1]) req.formData[_body[1]]=(''+_bodyes[item]).replace(reName,'').trim();
       }
       next();
     };
