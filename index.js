@@ -64,6 +64,7 @@ var queryCreatePdf = function(req, res, next) {
   var cfg;
   if(req.params.cfg) cfg = JSON.parse(req.params.cfg);
 
+
   var pdfCreator = new PdfCreator();
   var formData = req.formData || {};
   pdfCreator.create({html:formData.html||''})
