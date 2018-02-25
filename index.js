@@ -38,7 +38,7 @@ var WBDriveData = {
 };
 
 var cfg = {
-    timer: 5 * 1000,
+    timer: 60 * 1000,
     saveDir: "/documents/pdf/",
     fullSaveDir: __dirname + "/documents/pdf/",
 };
@@ -323,14 +323,11 @@ var trashCollector = function () {
         fs.access(filePath, function (err) {
             if (!err) {
                 fs.unlinkSync(filePath);
-                console.log('file ' +fileName +' was deleted from disk'  );
             }
         });
         cacheFiles.files.splice(v, 1);
-        console.log('file ' +fileName +' was deleted' );
     });
     updateCache();
-    console.log('Trash Collected!');
 };
 
 setInterval(trashCollector, cfg.timer);
@@ -341,7 +338,6 @@ var getFileFromList = function (hash) {
     });
     if (searchFileIndex + 1) {
         cacheFiles.files[searchFileIndex].time = new Date();
-        console.log('File timer updated');
         updateCache();
     }
 
@@ -350,7 +346,6 @@ var getFileFromList = function (hash) {
 
 var addFileToList = function (time, hash, name, fileName, documentId) {
     cacheFiles.files.push({"name": name, "time": time, "hash": hash, "filename": fileName, "documentId": documentId});
-    console.log('new file created');
     updateCache();
 };
 
@@ -390,7 +385,6 @@ PdfCreator.prototype.create = function (cfg) {
     wkhtmltopdfCfg.pageSize = cfg.pdf_format || 'A4';
     // wkhtmltopdfCfg.noPdfCompression = true;
     // wkhtmltopdfCfg.disableSmartShrinking = true;
-    console.log(html);
 
 //after some time we can delete pdf
 
