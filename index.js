@@ -38,7 +38,7 @@ var WBDriveData = {
 };
 
 var cfg = {
-    timer: 60 * 1000,
+    timer: 5 * 1000,
     saveDir: "/documents/pdf/",
     fullSaveDir: __dirname + "/documents/pdf/",
 };
