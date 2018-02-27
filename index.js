@@ -171,7 +171,31 @@ var queryTestCreatePdf = function (req, res, next) {
         'margin-bottom': 'marginBottom'
     };
     if (req.params.cfg) cfg = JSON.parse(req.params.cfg);
-    var pdfCreator = new PdfCreator();
+    var translateSettings = function(arr){
+        var settings=[];
+        var keys=Object.keys(arr);
+        var values=Object.values(arr);
+        keys.forEach(function (k,i) {
+            if (k == 'sheet-size'||k == 'pdf_format'||k == 'pageSize') {
+                if(paramsTranslator[keys[i] ])
+                    settings[paramsTranslator[keys[i] ]] = values[i].match(/(\w+)/gi)[0];
+                else
+                    settings[keys[i] ] = values[i].match(/(\w+)/gi)[0];
+
+                if (values[i].match(/(\w+)/gi).length > 1)
+                    if (values[i].match(/(\w+)/gi)[1] == 'L')
+                        settings['orientation'] = 'Landscape';
+                    else settings['orientation'] = 'Portrait';
+            }
+            else {
+                if(paramsTranslator[keys[i] ])
+                settings[paramsTranslator[keys[i] ]] = values[i];
+                else
+                    settings[keys[i] ] = values[i];
+            }
+        });
+        return settings;
+    };
     var createPdf = function (reqData) {
         var creatorCfg = reqData;
         var globalSettings = {};
@@ -216,6 +240,7 @@ var queryTestCreatePdf = function (req, res, next) {
         var testdir = 'testpdf/';
         var docdir = path.basename(creatorCfg.filename, '.pdf');
         var createdFolder = testdir + docdir;
+        globalSettings=translateSettings(globalSettings);
         fs.access(createdFolder, function (err) {
             if (!err) {
                 console.log('exist');
@@ -225,7 +250,7 @@ var queryTestCreatePdf = function (req, res, next) {
                     });
                 });
             } else {
-                fs.mkdirSync(createdFolder, function () {
+                fs.mkdir(createdFolder, function () {
                     console.log('not exist');
                     createBuffersArray(pages.length - 1);
                 });
@@ -233,23 +258,25 @@ var queryTestCreatePdf = function (req, res, next) {
         });
         function createBuffersArray(i) {
             if (i < 0) {
-                fs.readdir(createdFolder, function (err, files) {
-                    files.sort(function (a, b) {
-                        return a.match(/\d+/) - b.match(/\d+/);
+                setTimeout(function () {
+                    fs.readdir(createdFolder, function (err, files) {
+                        files.sort(function (a, b) {
+                            return a.match(/\d+/) - b.match(/\d+/);
+                        });
+                        files = files.map(function (t) {
+                            return createdFolder + '/' + t;
+                        });
+                        console.log(files);
+                        pdftk.input(files)
+                            .output()
+                            .then(function (buf) {
+                                res.type('application/pdf'); // If you omit this line, file will download
+                                res.send(buf);
+                            })
+                            .catch(next);
                     });
-                    files = files.map(function (t) {
-                        return createdFolder + '/' + t;
-                    });
-                    console.log(files);
-                    pdftk.input(files).flatten()
-                        .output('outFile.pdf')
-                        .then(function (buf) {
-                            res.type('application/pdf'); // If you omit this line, file will download
-                            res.send(buf);
-                        })
-                        .catch(next);
-                });
-                return true;
+                    return true;
+                },2000);
             }
             else {
                 if (pageSettings[i - 1]) {
@@ -259,6 +286,7 @@ var queryTestCreatePdf = function (req, res, next) {
                     settings.marginRight = settings.marginRight + 'px';
                     settings.marginBottom = settings.marginBottom + 'px'
                 }
+
                 else
                     var settings = {};
                 new Promise(function (resolve) {
