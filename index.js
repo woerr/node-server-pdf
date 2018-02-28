@@ -219,6 +219,7 @@ var queryTestCreatePdf = function (req, res, next) {
         pages = pages.map(function (v) {
             return customStyle + v;
         });
+        if(pageBreakers)
         var pageSettings = pageBreakers.map(function (t, number) {
             var pb = t.match(/((\S+)="(\S+)")/gi);
             var settings = {};
@@ -237,6 +238,7 @@ var queryTestCreatePdf = function (req, res, next) {
             });
             return settings;
         });
+        else pageSettings=[];
         var testdir = 'testpdf/';
         var docdir = path.basename(creatorCfg.filename, '.pdf');
         var createdFolder = testdir + docdir;
