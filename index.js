@@ -246,7 +246,7 @@ var queryTestCreatePdf = function (req, res, next) {
         fs.access(createdFolder, function (err) {
             if (!err) {
                 console.log('exist');
-                fs.rmdir(createdFolder, function () {
+                fs.unlink(createdFolder, function () {
                     fs.mkdir(createdFolder, function () {
                         createBuffersArray(pages.length - 1);
                     });
@@ -259,9 +259,15 @@ var queryTestCreatePdf = function (req, res, next) {
             }
         });
         function createBuffersArray(i) {
+            if (i < -40)return false;
             if (i < 0) {
-                setTimeout(function () {
+
                     fs.readdir(createdFolder, function (err, files) {
+                        if((!files)||(files.length<pages.length)){
+                        console.log('try - '+ (-i));
+                        setTimeout(function(){createBuffersArray(i - 1)},50);
+                        return
+                    }
                         files.sort(function (a, b) {
                             return a.match(/\d+/) - b.match(/\d+/);
                         });
@@ -278,7 +284,6 @@ var queryTestCreatePdf = function (req, res, next) {
                             .catch(next);
                     });
                     return true;
-                },2000);
             }
             else {
                 if (pageSettings[i - 1]) {
@@ -304,7 +309,9 @@ var queryTestCreatePdf = function (req, res, next) {
                         marginRight: settings.marginRight || globalSettings.marginRight,
                         marginBottom: settings.marginBottom || globalSettings.marginBottom,
                         disableSmartShrinking: true
-                    });
+                    }, function (e) {
+                        resolve();
+                    })
                 }).then(createBuffersArray(i - 1));
 
             }
