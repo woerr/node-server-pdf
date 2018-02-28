@@ -246,7 +246,7 @@ var queryTestCreatePdf = function (req, res, next) {
         fs.access(createdFolder, function (err) {
             if (!err) {
                 console.log('exist');
-                fs.unlink(createdFolder, function () {
+                fs.rmdir(createdFolder, function () {
                     fs.mkdir(createdFolder, function () {
                         createBuffersArray(pages.length - 1);
                     });
@@ -278,6 +278,13 @@ var queryTestCreatePdf = function (req, res, next) {
                         pdftk.input(files)
                             .output()
                             .then(function (buf) {
+                                files.forEach(function (f) {
+                                    console.log('file' + f +' deleted')
+                                    fs.unlinkSync(f)
+                                });
+                                fs.rmdirSync(createdFolder);
+                                console.log('createdFolder - ' +createdFolder +' deleted')
+
                                 res.type('application/pdf'); // If you omit this line, file will download
                                 res.send(buf);
                             })
