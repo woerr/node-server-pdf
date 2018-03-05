@@ -14,8 +14,7 @@ formidable = require('formidable');
 var cacheFiles = {};
 var updateCache = function () {
     fs.writeFile('cache_files.json', JSON.stringify(cacheFiles), function (err) {
-        if (!err)
-            console.log('cache_files.json has been updated!');
+        if (!err);
     });
 };
 
@@ -38,7 +37,7 @@ var WBDriveData = {
 };
 
 var cfg = {
-    timer: 5 * 1000,
+    timer: 60 * 1000,
     saveDir: "/documents/pdf/",
     fullSaveDir: __dirname + "/documents/pdf/",
 };
@@ -432,13 +431,13 @@ PdfCreator.prototype.create = function (cfg) {
 
 //after some time we can delete pdf
 
-    var customStyle = "<style>" +
-        "th,td,tr{ page-break-inside:avoid !important; position:static !important; }" +
-        "div{box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}" +
-        "</style>";
-
-
-    html = customStyle + html;
+    // var customStyle = "<style>" +
+    //     "th,td,tr{ page-break-inside:avoid !important; position:static !important; }" +
+    //     "div{box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}" +
+    //     "</style>";
+    //
+    //
+    // html = customStyle + html;
 
     // var userStyleSheet = cfg.userStyleSheet;
 
