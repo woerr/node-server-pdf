@@ -112,7 +112,6 @@ var queryCreatePdf = function (req, res, next) {
             .then(function (pdf) {
                 // pdf.path = pdf.path.replace('./','');
                 // res.send(pdf);
-                console.log(cfg);
                 res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(pdf.path)+((cfg.userFilename)?('/'+cfg.userFilename):''));
                 // res.sendFile(pdf.path, {root: __dirname});
             })
@@ -467,7 +466,6 @@ console.log(wkhtmltopdfCfg);
 
     return new Promise(function (resolve, reject) {
         wkhtmltopdf(html, wkhtmltopdfCfg, function (e) {
-            console.log(e);
             resolve({
                 saveDir: pdfCreator.saveDir,
                 fullSaveDir: pdfCreator.fullSaveDir,
