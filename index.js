@@ -105,14 +105,14 @@ var queryCreatePdf = function (req, res, next) {
         var cryptCfg = sha256(JSON.stringify(creatorCfg));// hash Конфига
         if (file = getFileFromList(cryptCfg)) {
             // console.log('Cache is working - '+file.name);
-            res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(file.name)+((cfg.userFilename)?('/'+cfg.userFilename):''));
+            res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(file.name)+((cfg&&cfg.userFilename)?('/'+cfg.userFilename):''));
         }
         else pdfCreator.create(creatorCfg)
         // pdfCreator.create({html:'<div>Test html <span>по русски</span></div>'})
             .then(function (pdf) {
                 // pdf.path = pdf.path.replace('./','');
                 // res.send(pdf);
-                res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(pdf.path)+((cfg.userFilename)?('/'+cfg.userFilename):''));
+                res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(pdf.path)+((cfg&&cfg.userFilename)?('/'+cfg.userFilename):''));
                 // res.sendFile(pdf.path, {root: __dirname});
             })
             .catch(function (e) {
