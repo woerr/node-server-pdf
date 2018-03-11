@@ -12,6 +12,7 @@ var app = require('express')(),
 formidable = require('formidable');
 // JSZip = require('jszip');
 var cacheFiles = {};
+
 var updateCache = function () {
     fs.writeFile('cache_files.json', JSON.stringify(cacheFiles), function (err) {
         if (!err);
@@ -104,14 +105,15 @@ var queryCreatePdf = function (req, res, next) {
         var cryptCfg = sha256(JSON.stringify(creatorCfg));// hash Конфига
         if (file = getFileFromList(cryptCfg)) {
             // console.log('Cache is working - '+file.name);
-            res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(file.name));
+            res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(file.name)+((cfg.userFilename)?('/'+cfg.userFilename):''));
         }
         else pdfCreator.create(creatorCfg)
         // pdfCreator.create({html:'<div>Test html <span>по русски</span></div>'})
             .then(function (pdf) {
                 // pdf.path = pdf.path.replace('./','');
                 // res.send(pdf);
-                res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(pdf.path));
+                console.log(cfg);
+                res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(pdf.path)+((cfg.userFilename)?('/'+cfg.userFilename):''));
                 // res.sendFile(pdf.path, {root: __dirname});
             })
             .catch(function (e) {
@@ -133,16 +135,20 @@ var queryCreatePdf = function (req, res, next) {
     }
 };
 
-var sendFile = function (fileName, response) {
-    const filePath = __dirname + fileName; // or any file format
-
+var sendFile = function (fileName, response,userFilename) {
+    const filePath = __dirname + fileName;
+    var filename='';
+    if (userFilename)
+        filename=userFilename;
+    else
+        filename=path.basename(fileName);
     // Check if file specified by the filePath exists
     fs.exists(filePath, function (exists) {
         if (exists) {
             // Content-type is very interesting part that guarantee that
             // Web browser will handle response in an appropriate manner.
             response.writeHead(200, {
-                "Content-Disposition": "inline; filename=\"" + path.basename(fileName) + "\""
+                "Content-Disposition": "inline; filename=\"" + filename  + "\""
             });
             fs.createReadStream(filePath).pipe(response);
         } else {
@@ -154,9 +160,10 @@ var sendFile = function (fileName, response) {
 
 var queryGetPdf = function (req, res, next) {
     var fileName = req.params.filename || '';
+    var userFileName=req.params.customName;
     var dir = cfg.saveDir;
     var path = dir + fileName;
-    sendFile(path, res);
+    sendFile(path, res,userFileName);
 };
 
 var queryTestCreatePdf = function (req, res, next) {
@@ -211,7 +218,7 @@ var queryTestCreatePdf = function (req, res, next) {
         var defaultFontFamily = cfg.fontFamily || 'verdana';
         var boxSizing = "border-box";
         globalSettings.pageSize = cfg.pdf_format || 'A4';
-        var html = creatorCfg.pdf_html;
+        var html = creatorCfg.pdf_html||creatorCfg.html;
         var customStyle = "<style> div,table {page-break-inside: avoid;box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}</style>";
         var pages = html.split(/<pagebreak.*<\/pagebreak>/);
         var pageBreakers = html.match(/(<pagebreak .+<\/pagebreak>)/g);
@@ -341,7 +348,7 @@ app.post('/createPdf/:cfg?', queryCreatePdf);
 app.post('/testCreatePdf/:cfg?', queryTestCreatePdf);
 app.get('/testCreatePdf/:cfg?', queryTestCreatePdf);
 app.get('/createPdf/:cfg?', queryCreatePdf);
-app.get('/getPdf/:filename?', queryGetPdf);
+app.get('/getPdf/:filename?/:customName?', queryGetPdf);
 
 server = http.listen(8080); // Запуск сервера.
 console.log("Сервер запущен http://localhost:" + 8080 + "/");
@@ -428,7 +435,7 @@ PdfCreator.prototype.create = function (cfg) {
     wkhtmltopdfCfg.pageSize = cfg.pdf_format || 'A4';
     // wkhtmltopdfCfg.noPdfCompression = true;
     // wkhtmltopdfCfg.disableSmartShrinking = true;
-
+console.log(wkhtmltopdfCfg);
 //after some time we can delete pdf
 
     // var customStyle = "<style>" +
@@ -449,15 +456,18 @@ PdfCreator.prototype.create = function (cfg) {
     mkdirp(pdfCreator.fullSaveDir, function (e) {
         if (e) console.log(e)
     });
-    if (cfg.filename)
-        var fileName = path.basename(cfg.filename, '.pdf') + "(" + mlsec + '' + sec + '' + min + '' + hour + ').pdf';
+    var fileName;
+    if (cfg.filename) {
+        fileName = path.basename(cfg.filename, '.pdf') + "(" + mlsec + '' + sec + '' + min + '' + hour + ').pdf';
+    }
     else
-        var fileName = mlsec + '' + sec + '' + min + '' + hour + '.pdf';
+        fileName = mlsec + '' + sec + '' + min + '' + hour + '.pdf';
     wkhtmltopdfCfg.output = filepath = cfg.path || pdfCreator.fullSaveDir + fileName;
     addFileToList(curentDateTime, cryptCfg, fileName);
 
     return new Promise(function (resolve, reject) {
         wkhtmltopdf(html, wkhtmltopdfCfg, function (e) {
+            console.log(e);
             resolve({
                 saveDir: pdfCreator.saveDir,
                 fullSaveDir: pdfCreator.fullSaveDir,
