@@ -120,11 +120,11 @@ var queryCreatePdf = function (req, res, next) {
             });
     };
     if (req._body) {
-        console.log('got url encode');
+        console.log(new Date()+'got url encode');
         createPdf(req.body);
     }
     else {
-        console.log('got formdata');
+        console.log(new Date()+'got formdata');
         var form = new formidable.IncomingForm();
         var formData;
         form.parse(req, function (err, fields, files) {
