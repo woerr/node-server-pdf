@@ -434,7 +434,6 @@ PdfCreator.prototype.create = function (cfg) {
     wkhtmltopdfCfg.pageSize = cfg.pdf_format || 'A4';
     // wkhtmltopdfCfg.noPdfCompression = true;
     // wkhtmltopdfCfg.disableSmartShrinking = true;
-console.log(wkhtmltopdfCfg);
 //after some time we can delete pdf
 
     // var customStyle = "<style>" +
