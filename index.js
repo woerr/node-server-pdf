@@ -86,7 +86,7 @@ var cfg = {
 //
 // };
 // app.use(formDataParse);
-app.use(bodyParser.urlencoded({extended: true, limit: '10mb'})); // for parsing application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({extended: true, limit: '100mb'})); // for parsing application/x-www-form-urlencoded
 app.use(bodyParser.json()); // for parsing application/json
 
 app.use(function (req, res, next) {
