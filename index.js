@@ -264,13 +264,13 @@ var queryTestCreatePdf = function (req, res, next) {
             }
         });
         function createBuffersArray(i) {
-            if (i < -40)return false;
+            if (i < -300)return false;
             if (i < 0) {
 
                     fs.readdir(createdFolder, function (err, files) {
                         if((!files)||(files.length<pages.length)){
                         console.log('try - '+ (-i));
-                        setTimeout(function(){createBuffersArray(i - 1)},50);
+                        setTimeout(function(){createBuffersArray(i - 1)},500);
                         return
                     }
                         files.sort(function (a, b) {
@@ -331,6 +331,7 @@ var queryTestCreatePdf = function (req, res, next) {
         }
     };
     if (!req.body) {
+        console.log(new Date()+'got url encode');
         var form = new formidable.IncomingForm();
         var formData;
         form.parse(req, function (err, fields, files) {
@@ -339,6 +340,7 @@ var queryTestCreatePdf = function (req, res, next) {
         });
     }
     else {
+        console.log(new Date()+'got formdata');
         createPdf(req.body);
     }
 };
