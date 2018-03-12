@@ -224,6 +224,10 @@ var queryTestCreatePdf = function (req, res, next) {
         pages = pages.map(function (v) {
             return customStyle + v;
         });
+        var customStyle = "<style>" +
+            "th,td,tr{ page-break-inside:avoid !important; position:static !important; }" +
+            "div{box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}" +
+            "</style>";
         if(pageBreakers)
         var pageSettings = pageBreakers.map(function (t, number) {
             var pb = t.match(/((\S+)="(\S+)")/gi);
@@ -266,7 +270,6 @@ var queryTestCreatePdf = function (req, res, next) {
         function createBuffersArray(i) {
             if (i < -300)return false;
             if (i < 0) {
-
                     fs.readdir(createdFolder, function (err, files) {
                         if((!files)||(files.length<pages.length)){
                         console.log('try - '+ (-i));
@@ -310,7 +313,7 @@ var queryTestCreatePdf = function (req, res, next) {
                     var settings = {};
                 new Promise(function (resolve) {
                     var outPath = createdFolder + '/' + i + '.pdf';
-                    wkhtmltopdf(pages[i], {
+                    wkhtmltopdf(customStyle+pages[i], {
                         output: outPath,
                         encoding: settings.encoding || globalSettings.encoding,
                         noPdfCompression: true,
