@@ -15,7 +15,7 @@ var cacheFiles = {};
 
 var updateCache = function () {
     fs.writeFile('cache_files.json', JSON.stringify(cacheFiles), function (err) {
-        if (!err);
+        if (!err) ;
     });
 };
 
@@ -38,7 +38,7 @@ var WBDriveData = {
 };
 
 var cfg = {
-    timer: 60 * 1000,
+    timer: 60 * 1000 * 60,
     saveDir: "/documents/pdf/",
     fullSaveDir: __dirname + "/documents/pdf/",
 };
@@ -105,14 +105,14 @@ var queryCreatePdf = function (req, res, next) {
         var cryptCfg = sha256(JSON.stringify(creatorCfg));// hash Конфига
         if (file = getFileFromList(cryptCfg)) {
             // console.log('Cache is working - '+file.name);
-            res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(file.name)+((cfg&&cfg.userFilename)?('/'+cfg.userFilename):''));
+            res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(file.name) + ((cfg && cfg.userFilename) ? ('/' + cfg.userFilename) : ''));
         }
         else pdfCreator.create(creatorCfg)
         // pdfCreator.create({html:'<div>Test html <span>по русски</span></div>'})
             .then(function (pdf) {
                 // pdf.path = pdf.path.replace('./','');
                 // res.send(pdf);
-                res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(pdf.path)+((cfg&&cfg.userFilename)?('/'+cfg.userFilename):''));
+                res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(pdf.path) + ((cfg && cfg.userFilename) ? ('/' + cfg.userFilename) : ''));
                 // res.sendFile(pdf.path, {root: __dirname});
             })
             .catch(function (e) {
@@ -120,11 +120,11 @@ var queryCreatePdf = function (req, res, next) {
             });
     };
     if (req._body) {
-        console.log(new Date()+'got url encode');
+        console.log(new Date() + 'got url encode');
         createPdf(req.body);
     }
     else {
-        console.log(new Date()+'got formdata');
+        console.log(new Date() + 'got formdata');
         var form = new formidable.IncomingForm();
         var formData;
         form.parse(req, function (err, fields, files) {
@@ -134,20 +134,21 @@ var queryCreatePdf = function (req, res, next) {
     }
 };
 
-var sendFile = function (fileName, response,userFilename) {
+var sendFile = function (fileName, response, userFilename) {
     const filePath = __dirname + fileName;
-    var filename='';
+    var filename = '';
     if (userFilename)
-        filename=userFilename;
+        filename = userFilename;
     else
-        filename=path.basename(fileName);
+        filename = path.basename(fileName);
     // Check if file specified by the filePath exists
     fs.exists(filePath, function (exists) {
         if (exists) {
             // Content-type is very interesting part that guarantee that
             // Web browser will handle response in an appropriate manner.
             response.writeHead(200, {
-                "Content-Disposition": "inline; filename=\"" + filename  + "\""
+                "Content-Disposition": "inline; filename=\"" + filename + "\"",
+                "Location": server.address() + filePath
             });
             fs.createReadStream(filePath).pipe(response);
         } else {
@@ -159,15 +160,52 @@ var sendFile = function (fileName, response,userFilename) {
 
 var queryGetPdf = function (req, res, next) {
     var fileName = req.params.filename || '';
-    var userFileName=req.params.customName;
+    var userFileName = req.params.customName;
     var dir = cfg.saveDir;
     var path = dir + fileName;
-    sendFile(path, res,userFileName);
+    sendFile(path, res, userFileName);
 };
+
+function parseRequest(req) {
+    if (!req._body) {
+        console.log(new Date() + 'got url encode');
+        var form = new formidable.IncomingForm();
+        var formData;
+        form.parse(req, function (err, fields, files) {
+            formData = fields;
+            return (formData);
+        });
+    }
+    else {
+        console.log(new Date() + 'got formdata');
+        return (req.body);
+    }
+}
+
+function implodePdfInDir(dirName, fileName, req, res) {
+    var implodeResult;
+    fs.readdir(dirName, function (err, files) {
+        if (err)
+            return false;
+        console.log(files);
+        var resultFilename='pdftkOut'+  new Date().getTime() + '.pdf';
+        pdftk
+            .input(files.map(function (v) {
+                    return dirName +'/'+ v;
+                })
+            )
+            .cat()
+            .output(fileName || 'documents/pdf/'+resultFilename)
+            .then( function(){res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(resultFilename));})
+
+    });
+}
+
 
 var queryTestCreatePdf = function (req, res, next) {
     var cfg;
     var file;
+    console.log(new Date() + ' got request');
     var paramsTranslator = {
         'sheet-size': 'pageSize',
         'margin-left': 'marginLeft',
@@ -176,16 +214,16 @@ var queryTestCreatePdf = function (req, res, next) {
         'margin-bottom': 'marginBottom'
     };
     if (req.params.cfg) cfg = JSON.parse(req.params.cfg);
-    var translateSettings = function(arr){
-        var settings=[];
-        var keys=Object.keys(arr);
-        var values=Object.values(arr);
-        keys.forEach(function (k,i) {
-            if (k == 'sheet-size'||k == 'pdf_format'||k == 'pageSize') {
-                if(paramsTranslator[keys[i] ])
-                    settings[paramsTranslator[keys[i] ]] = values[i].match(/(\w+)/gi)[0];
+    var translateSettings = function (arr) {
+        var settings = [];
+        var keys = Object.keys(arr);
+        var values = Object.values(arr);
+        keys.forEach(function (k, i) {
+            if (k == 'sheet-size' || k == 'pdf_format' || k == 'pageSize') {
+                if (paramsTranslator[keys[i]])
+                    settings[paramsTranslator[keys[i]]] = values[i].match(/(\w+)/gi)[0];
                 else
-                    settings[keys[i] ] = values[i].match(/(\w+)/gi)[0];
+                    settings[keys[i]] = values[i].match(/(\w+)/gi)[0];
 
                 if (values[i].match(/(\w+)/gi).length > 1)
                     if (values[i].match(/(\w+)/gi)[1] == 'L')
@@ -193,10 +231,10 @@ var queryTestCreatePdf = function (req, res, next) {
                     else settings['orientation'] = 'Portrait';
             }
             else {
-                if(paramsTranslator[keys[i] ])
-                settings[paramsTranslator[keys[i] ]] = values[i];
+                if (paramsTranslator[keys[i]])
+                    settings[paramsTranslator[keys[i]]] = values[i];
                 else
-                    settings[keys[i] ] = values[i];
+                    settings[keys[i]] = values[i];
             }
         });
         return settings;
@@ -217,45 +255,50 @@ var queryTestCreatePdf = function (req, res, next) {
         var defaultFontFamily = cfg.fontFamily || 'verdana';
         var boxSizing = "border-box";
         globalSettings.pageSize = cfg.pdf_format || 'A4';
-        var html = creatorCfg.pdf_html||creatorCfg.html;
-        var customStyle = "<style> div,table {page-break-inside: avoid;box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}</style>";
-        var pages = html.split(/<pagebreak.*<\/pagebreak>/);
-        var pageBreakers = html.match(/(<pagebreak .+<\/pagebreak>)/g);
-        pages = pages.map(function (v) {
-            return customStyle + v;
-        });
-        var customStyle = "<style>" +
-            "th,td,tr{ page-break-inside:avoid !important; position:static !important; }" +
-            "div{box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}" +
-            "</style>";
-        if(pageBreakers)
-        var pageSettings = pageBreakers.map(function (t, number) {
-            var pb = t.match(/((\S+)="(\S+)")/gi);
-            var settings = {};
-            pb.forEach(function (v) {
-                var row = v.split('=');
-                if (row[0] == 'sheet-size') {
-                    settings[paramsTranslator[row[0]]] = row[1].match(/(\w+)/gi)[0];
-                    if (row[1].match(/(\w+)/gi).length > 1)
-                        if (row[1].match(/(\w+)/gi)[1] == 'L')
-                            settings['orientation'] = 'Landscape';
-                        else settings['orientation'] = 'Portrait';
-                }
-                else {
-                    settings[paramsTranslator[row[0]]] = row[1].substr(1, row[1].length - 2);
-                }
+        var html = creatorCfg.html || creatorCfg['pdf_html'];
+        // var customStyle = "<style>tr,td,th{page-break-inside: avoid;} table{page-break-inside: auto;box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}</style>";
+        // var customStyle ='<link rel="stylesheet" href="http://weldbook.ru/css/wkhtml_style_block.css">';
+        //  var customStyle ='';
+        console.log(creatorCfg);
+        var pages = html.split(/<pagebreak[^<]*<\/pagebreak>/g);
+        var pageBreakers = html.match(/(<pagebreak[^<]*<\/pagebreak>)/g);
+        // pages = pages.map(function (v) {
+        //     return customStyle + v;
+        // });
+        // var customStyle = "<style>" +
+        //     "th,td,tr{ page-break-inside:avoid !important; position:static !important; }" +
+        //     "div{box-sizing: " + boxSizing + ";font-size: " + defaultFontSize + ";font-family: " + defaultFontFamily + "}" +
+        //     "</style>";
+        //
+        if (pageBreakers)
+            var pageSettings = pageBreakers.map(function (t, number) {
+                var pb = t.match(/((\S+)=[",'](\S+)[',"])/gi);
+                var settings = {};
+                pb.forEach(function (v) {
+                    var row = v.split('=');
+                    if (row[0] == 'sheet-size') {
+                        settings[paramsTranslator[row[0]]] = row[1].match(/(\w+)/gi)[0];
+                        if (row[1].match(/(\w+)/gi).length > 1)
+                            if (row[1].match(/(\w+)/gi)[1] == 'L')
+                                settings['orientation'] = 'Landscape';
+                            else settings['orientation'] = 'Portrait';
+                    }
+                    else {
+                        settings[paramsTranslator[row[0]]] = row[1].substr(1, row[1].length - 2);
+                    }
+                });
+                return settings;
             });
-            return settings;
-        });
-        else pageSettings=[];
+        else pageSettings = [];
         var testdir = 'testpdf/';
         var docdir = path.basename(creatorCfg.filename, '.pdf');
         var createdFolder = testdir + docdir;
-        globalSettings=translateSettings(globalSettings);
+        globalSettings = translateSettings(globalSettings);
         fs.access(createdFolder, function (err) {
             if (!err) {
                 console.log('exist');
                 fs.rmdir(createdFolder, function () {
+                    console.log('existFolder removed');
                     fs.mkdir(createdFolder, function () {
                         createBuffersArray(pages.length - 1);
                     });
@@ -267,40 +310,21 @@ var queryTestCreatePdf = function (req, res, next) {
                 });
             }
         });
-        function createBuffersArray(i) {
-            if (i < -300)return false;
-            if (i < 0) {
-                    fs.readdir(createdFolder, function (err, files) {
-                        if((!files)||(files.length<pages.length)){
-                        console.log('try - '+ (-i));
-                        setTimeout(function(){createBuffersArray(i - 1)},500);
-                        return
-                    }
-                        files.sort(function (a, b) {
-                            return a.match(/\d+/) - b.match(/\d+/);
-                        });
-                        files = files.map(function (t) {
-                            return createdFolder + '/' + t;
-                        });
-                        console.log(files);
-                        pdftk.input(files)
-                            .output()
-                            .then(function (buf) {
-                                files.forEach(function (f) {
-                                    console.log('file' + f +' deleted')
-                                    fs.unlinkSync(f)
-                                });
-                                fs.rmdirSync(createdFolder);
-                                console.log('createdFolder - ' +createdFolder +' deleted')
 
-                                res.type('application/pdf'); // If you omit this line, file will download
-                                res.send(buf);
-                            })
-                            .catch(next);
-                    });
-                    return true;
+        function createBuffersArray(i) {
+            if (i < -300) return false;
+            if (i < 0) {
+                console.log('pages rendered');
+                setTimeout(function () {
+                    var ret = false;
+                    console.log('try -', 0 - i);
+                    ret = implodePdfInDir(createdFolder, null, req, res);
+
+                }, 1000);
+
             }
             else {
+                console.log('render page - ', i);
                 if (pageSettings[i - 1]) {
                     var settings = pageSettings[i - 1];
                     settings.marginLeft = settings.marginLeft + 'px';
@@ -311,30 +335,32 @@ var queryTestCreatePdf = function (req, res, next) {
 
                 else
                     var settings = {};
-                new Promise(function (resolve) {
-                    var outPath = createdFolder + '/' + i + '.pdf';
-                    wkhtmltopdf(customStyle+pages[i], {
-                        output: outPath,
-                        encoding: settings.encoding || globalSettings.encoding,
-                        noPdfCompression: true,
-                        pageSize: settings.pageSize || globalSettings.pageSize,
-                        orientation: settings.orientation || globalSettings.orientation,
-                        marginLeft: settings.marginLeft || globalSettings.marginLeft,
-                        marginTop: settings.marginTop || globalSettings.marginTop,
-                        marginRight: settings.marginRight || globalSettings.marginRight,
-                        marginBottom: settings.marginBottom || globalSettings.marginBottom,
-                        disableSmartShrinking: true
-                    }, function (e) {
-                        resolve();
-                    })
-                }).then(createBuffersArray(i - 1));
+                var outPath = createdFolder + '/' + i + '.pdf';
+                wkhtmltopdf(pages[i].toString(), {
+                    output: outPath,
+                    encoding: settings.encoding || globalSettings.encoding,
+                    noPdfCompression: false,
+                    pageSize: (!settings.pageSize||settings.pageSize.indexOf('undefined')+1)?globalSettings.pageSize:settings.pageSize,
+                    orientation: (!settings.orientation||settings.orientation.indexOf('undefined')+1)?globalSettings.orientation:settings.orientation,
+                    marginLeft: (!settings.marginLeft||settings.marginLeft.indexOf('undefined')+1)? globalSettings.marginLeft:settings.marginLeft,
+                    marginTop: (!settings.marginTop||settings.marginTop.indexOf('undefined')+1)? globalSettings.marginTop:settings.marginTop,
+                    marginRight: (!settings.marginRight||settings.marginRight.indexOf('undefined')+1)? globalSettings.marginRight:settings.marginRight,
+                    marginBottom: (!settings.marginBottom||settings.marginBottom.indexOf('undefined')+1)? globalSettings.marginBottom:settings.marginBottom,
+                    disableSmartShrinking: false
+                }, function (e,stream) {
+                     console.log('wkhtml debug');
+                    if (e)
+                        console.log('wkhtml error', e);
+                    createBuffersArray(i-1);
+                })
+
 
             }
 
         }
     };
-    if (!req.body) {
-        console.log(new Date()+'got url encode');
+    if (!req._body) {
+        console.log(new Date() + 'got url encode');
         var form = new formidable.IncomingForm();
         var formData;
         form.parse(req, function (err, fields, files) {
@@ -343,9 +369,10 @@ var queryTestCreatePdf = function (req, res, next) {
         });
     }
     else {
-        console.log(new Date()+'got formdata');
+        console.log(new Date() + 'got formdata');
         createPdf(req.body);
     }
+    // createPdf(parseRequest(req));
 };
 
 app.post('/createPdf/:cfg?', queryCreatePdf);
@@ -362,17 +389,17 @@ var trashCollector = function () {
     var delArray = [];
     var filesCount = cacheFiles.files.length;
     if (filesCount.length == 0) return false;
-    var outdate=cacheFiles.files.some(function (t,i)  {
+    var outdate = cacheFiles.files.some(function (t, i) {
         var fileTime = new Date(cacheFiles.files[i].time);
-        var toDelete=((curDate - fileTime)) > cfg.timer;
-        if (toDelete){
+        var toDelete = ((curDate - fileTime)) > cfg.timer;
+        if (toDelete) {
             delArray.push(i);
         }
         return toDelete;
     });
     if (!outdate) return false;
     delArray.every(function (v) {
-        var fileName=cacheFiles.files[v].name;
+        var fileName = cacheFiles.files[v].name;
         var filePath = cfg.fullSaveDir + fileName;
         fs.access(filePath, function (err) {
             if (!err) {
