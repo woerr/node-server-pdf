@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/woerr/node-server-pdf#readme",
   "dependencies": {
+    "axios": "^0.18.0",
     "body-parser": "^1.18.2",
     "crypto": "^1.0.1",
     "express": "^4.16.3",
@@ -38,6 +39,7 @@
     "wkhtmltopdf": "^0.3.4",
     "wkhtmltopdf-nodejs-options-wrapper": "^1.0.7",
     "wkhtmltopdf-nodejs-pdfapi": "^1.0.4",
-    "wkhtmltopdf-nodejs-ws-server": "^1.0.2"
+    "wkhtmltopdf-nodejs-ws-server": "^1.0.2",
+    "request": "latest"
   }
 }

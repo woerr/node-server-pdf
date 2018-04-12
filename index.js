@@ -2,8 +2,9 @@ var app = require('express')(),
     bodyParser = require('body-parser'),
     mkdirp = require('mkdirp'),
     http = require('http').Server(app),
-    server,
+    axios = require('axios'),
     fs = require('fs'),
+    request = require('request'),
     wkhtmltopdf = require('wkhtmltopdf'),
     sha256 = require('sha256'),
     pdftk = require('node-pdftk');
@@ -171,7 +172,9 @@ function parseRequest(req) {
         console.log(new Date() + 'got url encode');
         var form = new formidable.IncomingForm();
         var formData;
+        return form;
         form.parse(req, function (err, fields, files) {
+            console.log('parsed', fields);
             formData = fields;
             return (formData);
         });
@@ -188,19 +191,86 @@ function implodePdfInDir(dirName, fileName, req, res) {
         if (err)
             return false;
         console.log(files);
-        var resultFilename='pdftkOut'+  new Date().getTime() + '.pdf';
+        var resultFilename = 'pdftkOut' + new Date().getTime() + '.pdf';
         pdftk
             .input(files.map(function (v) {
-                    return dirName +'/'+ v;
+                    return dirName + '/' + v;
                 })
             )
             .cat()
-            .output(fileName || 'documents/pdf/'+resultFilename)
-            .then( function(){res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(resultFilename));})
+            .output(fileName || 'documents/pdf/' + resultFilename)
+            .then(function (buffer) {
+                rimraf(dirName);
+
+                var cfgData = JSON.parse(req.params.cfg);
+                console.log('got sendToWBF Data', cfgData);
+                if (cfgData.sendToWBF) {
+                    console.log('got sendToWBF Data', cfgData.sendToWBF);
+                    var formData={};
+                    for(var key in cfgData.sendToWBF)
+                        formData[key]=cfgData.sendToWBF[key]
+                    formData['userfile'] = {
+                            value: buffer,
+                            options: {
+                                filename: 'test1.pdf',
+                                contentType: 'application/pdf'
+                            }
+
+                    };
+                    delete formData['application'];
+                    request.post('http://php-weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF',{formData:formData}, function (err, resp, body) {
+                        if (err) {
+                            console.log('Error!');
+                            res.send('Error!');
+                        } else {
+                           res.send(body);
+                        }
+                    });
+
+                    // request({
+                    //     uri: 'http://php-weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF',
+                    //     json:true,
+                    //     body:cfgData.sendToWBF,
+                    //     method: 'POST',
+                    //     responseType: 'text'
+                    // },  function (error, response, body) {
+                    //     if (error) {
+                    //         return console.error('upload failed:', error);
+                    //     }
+                    //     console.log('Upload successful!  Server responded with:', body);
+                    // })
+                // ).then(function (resp) {
+                //         res.write(resp.data);
+                //         res.end();
+                //     }).catch(function (err) {
+                //         console.log('request send error', err)
+                //     });
+
+                }
+                else
+                    res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(resultFilename));
+            }).catch(function(err){
+                console.log('implode fail',err);
+                res.send('implode fail');
+        })
 
     });
 }
 
+function rimraf(dir_path) {
+    console.log('delete ' + dir_path);
+    if (fs.existsSync(dir_path)) {
+        fs.readdirSync(dir_path).forEach(function (entry) {
+            var entry_path = path.join(dir_path, entry);
+            if (fs.lstatSync(entry_path).isDirectory()) {
+                rimraf(entry_path);
+            } else {
+                fs.unlinkSync(entry_path);
+            }
+        });
+        fs.rmdirSync(dir_path);
+    }
+}
 
 var queryTestCreatePdf = function (req, res, next) {
     var cfg;
@@ -291,21 +361,21 @@ var queryTestCreatePdf = function (req, res, next) {
             });
         else pageSettings = [];
         var testdir = 'testpdf/';
-        var docdir = path.basename(creatorCfg.filename, '.pdf');
+        var docdir = path.basename(creatorCfg.filename, '.pdf') + new Date().getTime();
         var createdFolder = testdir + docdir;
         globalSettings = translateSettings(globalSettings);
         fs.access(createdFolder, function (err) {
             if (!err) {
                 console.log('exist');
-                fs.rmdir(createdFolder, function () {
-                    console.log('existFolder removed');
+                fs.rmdir(createdFolder, function (e) {
+                    console.log('existFolder removed. err', e);
                     fs.mkdir(createdFolder, function () {
                         createBuffersArray(pages.length - 1);
                     });
                 });
             } else {
                 fs.mkdir(createdFolder, function () {
-                    console.log('not exist');
+                    console.log(createdFolder + ' not exist');
                     createBuffersArray(pages.length - 1);
                 });
             }
@@ -339,19 +409,19 @@ var queryTestCreatePdf = function (req, res, next) {
                 wkhtmltopdf(pages[i].toString(), {
                     output: outPath,
                     encoding: settings.encoding || globalSettings.encoding,
-                    noPdfCompression: false,
-                    pageSize: (!settings.pageSize||settings.pageSize.indexOf('undefined')+1)?globalSettings.pageSize:settings.pageSize,
-                    orientation: (!settings.orientation||settings.orientation.indexOf('undefined')+1)?globalSettings.orientation:settings.orientation,
-                    marginLeft: (!settings.marginLeft||settings.marginLeft.indexOf('undefined')+1)? globalSettings.marginLeft:settings.marginLeft,
-                    marginTop: (!settings.marginTop||settings.marginTop.indexOf('undefined')+1)? globalSettings.marginTop:settings.marginTop,
-                    marginRight: (!settings.marginRight||settings.marginRight.indexOf('undefined')+1)? globalSettings.marginRight:settings.marginRight,
-                    marginBottom: (!settings.marginBottom||settings.marginBottom.indexOf('undefined')+1)? globalSettings.marginBottom:settings.marginBottom,
-                    disableSmartShrinking: false
-                }, function (e,stream) {
-                     console.log('wkhtml debug');
+                    // noPdfCompression: false,
+                    pageSize: (!settings.pageSize || settings.pageSize.indexOf('undefined') + 1) ? globalSettings.pageSize : settings.pageSize,
+                    orientation: (!settings.orientation || settings.orientation.indexOf('undefined') + 1) ? globalSettings.orientation : settings.orientation,
+                    marginLeft: (!settings.marginLeft || settings.marginLeft.indexOf('undefined') + 1) ? globalSettings.marginLeft : settings.marginLeft,
+                    marginTop: (!settings.marginTop || settings.marginTop.indexOf('undefined') + 1) ? globalSettings.marginTop : settings.marginTop,
+                    marginRight: (!settings.marginRight || settings.marginRight.indexOf('undefined') + 1) ? globalSettings.marginRight : settings.marginRight,
+                    marginBottom: (!settings.marginBottom || settings.marginBottom.indexOf('undefined') + 1) ? globalSettings.marginBottom : settings.marginBottom,
+                    disableSmartShrinking: true
+                }, function (e, stream) {
+                    console.log('wkhtml debug');
                     if (e)
                         console.log('wkhtml error', e);
-                    createBuffersArray(i-1);
+                    createBuffersArray(i - 1);
                 })
 
 
