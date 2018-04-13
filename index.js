@@ -484,7 +484,7 @@ var queryPdfPages = function (req, res, next) {
                             }
                         };
                         for(var key in formData){if(formData[key]===null)delete formData[key]};
-                        request.post('http://php-weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
+                        request.post('http://weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
                             if (err) {
                                 console.log('Error!');
                                 res.send('Error!');
