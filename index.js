@@ -497,7 +497,10 @@ var queryPdfPages = function (req, res, next) {
                     else
                     res.download('./donePdftkCat.pdf',gotFiles['userfile'].name);
                     }
-                );
+                ).catch(function(error){
+                res.send({status: false, msg: error});
+                return;
+            });
         });
     }
     else {
