@@ -459,7 +459,7 @@ var queryPdfPages = function (req, res, next) {
         var form = new formidable.IncomingForm();
         var formData;
         form.parse(req, function (err, fields, files) {
-            console.log(fields,files);
+            // console.log(fields,files);
             formData = fields;
             if (!formData.catParams){
                 res.send({status: false, msg: 'requestFail'});
@@ -472,9 +472,9 @@ var queryPdfPages = function (req, res, next) {
                 .output('./donePdftkCat.pdf')
                 .then(function (buffer) {
                     var cfgData = fields;
-                    console.log('got sendToWBF Data', cfgData);
+                    // console.log('got sendToWBF Data', cfgData);
                     if (cfgData.sendToWBF) {
-                        console.log('got sendToWBF Data', cfgData.sendToWBF);
+                        // console.log('got sendToWBF Data', cfgData.sendToWBF);
                         var formData = cfgData;
                         formData['userfile'] = {
                             value: buffer,
