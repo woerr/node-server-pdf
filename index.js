@@ -206,24 +206,24 @@ function implodePdfInDir(dirName, fileName, req, res) {
                 console.log('got sendToWBF Data', cfgData);
                 if (cfgData.sendToWBF) {
                     console.log('got sendToWBF Data', cfgData.sendToWBF);
-                    var formData={};
-                    for(var key in cfgData.sendToWBF)
-                        formData[key]=cfgData.sendToWBF[key]
+                    var formData = {};
+                    for (var key in cfgData.sendToWBF)
+                        formData[key] = cfgData.sendToWBF[key]
                     formData['userfile'] = {
-                            value: buffer,
-                            options: {
-                                filename: 'test1.pdf',
-                                contentType: 'application/pdf'
-                            }
+                        value: buffer,
+                        options: {
+                            filename: 'test1.pdf',
+                            contentType: 'application/pdf'
+                        }
 
                     };
                     delete formData['application'];
-                    request.post('http://php-weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF',{formData:formData}, function (err, resp, body) {
+                    request.post('http://php-weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
                         if (err) {
                             console.log('Error!');
                             res.send('Error!');
                         } else {
-                           res.send(body);
+                            res.send(body);
                         }
                     });
 
@@ -239,19 +239,19 @@ function implodePdfInDir(dirName, fileName, req, res) {
                     //     }
                     //     console.log('Upload successful!  Server responded with:', body);
                     // })
-                // ).then(function (resp) {
-                //         res.write(resp.data);
-                //         res.end();
-                //     }).catch(function (err) {
-                //         console.log('request send error', err)
-                //     });
+                    // ).then(function (resp) {
+                    //         res.write(resp.data);
+                    //         res.end();
+                    //     }).catch(function (err) {
+                    //         console.log('request send error', err)
+                    //     });
 
                 }
                 else
                     res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(resultFilename));
-            }).catch(function(err){
-                console.log('implode fail',err);
-                res.send('implode fail');
+            }).catch(function (err) {
+            console.log('implode fail', err);
+            res.send('implode fail');
         })
 
     });
@@ -330,6 +330,12 @@ var queryTestCreatePdf = function (req, res, next) {
         // var customStyle ='<link rel="stylesheet" href="http://weldbook.ru/css/wkhtml_style_block.css">';
         //  var customStyle ='';
         console.log(creatorCfg);
+        if (!html) {
+            res.send({status: false, msg: 'no html'});
+            res.end();
+            return;
+        }
+
         var pages = html.split(/<pagebreak[^<]*<\/pagebreak>/g);
         var pageBreakers = html.match(/(<pagebreak[^<]*<\/pagebreak>)/g);
         // pages = pages.map(function (v) {
@@ -409,7 +415,7 @@ var queryTestCreatePdf = function (req, res, next) {
                 wkhtmltopdf(pages[i].toString(), {
                     output: outPath,
                     encoding: settings.encoding || globalSettings.encoding,
-                    // noPdfCompression: false,
+                    noPdfCompression: true,
                     pageSize: (!settings.pageSize || settings.pageSize.indexOf('undefined') + 1) ? globalSettings.pageSize : settings.pageSize,
                     orientation: (!settings.orientation || settings.orientation.indexOf('undefined') + 1) ? globalSettings.orientation : settings.orientation,
                     marginLeft: (!settings.marginLeft || settings.marginLeft.indexOf('undefined') + 1) ? globalSettings.marginLeft : settings.marginLeft,
@@ -445,9 +451,64 @@ var queryTestCreatePdf = function (req, res, next) {
     // createPdf(parseRequest(req));
 };
 
+
+var queryPdfPages = function (req, res, next) {
+    var gotFiles;
+    if (!req._body) {
+        console.log(new Date() + 'got url encode');
+        var form = new formidable.IncomingForm();
+        var formData;
+        form.parse(req, function (err, fields, files) {
+            console.log(fields,files);
+            formData = fields;
+            if (!formData.catParams){
+                res.send({status: false, msg: 'requestFail'});
+                return;
+            }
+            gotFiles = files;
+            pdftk
+                .input(gotFiles['userfile'].path)
+                .cat(formData.catParams)
+                .output('./donePdftkCat.pdf')
+                .then(function (buffer) {
+                    var cfgData = fields;
+                    console.log('got sendToWBF Data', cfgData);
+                    if (cfgData.sendToWBF) {
+                        console.log('got sendToWBF Data', cfgData.sendToWBF);
+                        var formData = cfgData;
+                        formData['userfile'] = {
+                            value: buffer,
+                            options: {
+                                filename: 'test1.pdf',
+                                contentType: 'application/pdf'
+                            }
+                        };
+                        for(var key in formData){if(formData[key]===null)delete formData[key]};
+                        request.post('http://php-weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
+                            if (err) {
+                                console.log('Error!');
+                                res.send('Error!');
+                            } else {
+                                res.send(body);
+                            }
+                        });
+
+                    }
+                    else
+                    res.download('./donePdftkCat.pdf',gotFiles['userfile'].name);
+                    }
+                );
+        });
+    }
+    else {
+        console.log(new Date() + 'got formdata');
+    }
+};
 app.post('/createPdf/:cfg?', queryCreatePdf);
 app.post('/testCreatePdf/:cfg?', queryTestCreatePdf);
 app.get('/testCreatePdf/:cfg?', queryTestCreatePdf);
+app.post('/getPdfPages/:cfg?', queryPdfPages);
+app.get('/getPdfPages/:cfg?', queryPdfPages);
 app.get('/createPdf/:cfg?', queryCreatePdf);
 app.get('/getPdf/:filename?/:customName?', queryGetPdf);
 
