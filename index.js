@@ -1,26 +1,35 @@
-var app = require('express')(),
+const app = require('express')(),
     bodyParser = require('body-parser'),
     mkdirp = require('mkdirp'),
     http = require('http').Server(app),
-    axios = require('axios'),
+    unzip = require('unzip'),
     fs = require('fs'),
     request = require('request'),
     wkhtmltopdf = require('wkhtmltopdf'),
     sha256 = require('sha256'),
-    pdftk = require('node-pdftk');
+    archiver = require('archiver');
+pdftk = require('node-pdftk');
+const unzipResponse = require('unzip-response');
 // multer = require('multer'); // v1.0.5
 // upload = multer(); // for parsing multipart/form-data;
 formidable = require('formidable');
 // JSZip = require('jszip');
-var cacheFiles = {};
+let cacheFiles = {};
 
-var updateCache = function () {
+const enviroment = {
+    weldbookUrl: 'weldbook.ru',
+    WBFUrl: 'tobolsk.weldbook.ru/WBF'
+};
+if (process.argv.findIndex(x => x == '-WBUrl') + 1)
+    enviroment.weldbookUrl = process.argv[process.argv.findIndex(x => x == '-WBUrl') + 1];
+console.log(enviroment);
+const updateCache = function () {
     fs.writeFile('cache_files.json', JSON.stringify(cacheFiles), function (err) {
         if (!err) ;
     });
 };
 
-var getFilesCache = function () {
+const getFilesCache = function () {
     fs.readFile('cache_files.json', function (err, rawdata) {
         if (!err)
             cacheFiles = JSON.parse(rawdata);
@@ -31,14 +40,14 @@ getFilesCache();
 
 const path = require('path');
 
-var WBDriveData = {
+const WBDriveData = {
     login: 'Node_Pdf_Generator',
     pwd: 'f6b7895fcb63a3d9bbf7301520014fe0',
     folderId: 15,
-    url: 'http://tobolsk.weldbook.ru/WBDrive/op/op.AddDocumentXDomain.php'
+    url: 'http://tobolsk.weldbook.ru/WBF/'
 };
 
-var cfg = {
+const cfg = {
     timer: 60 * 1000 * 60,
     saveDir: "/documents/pdf/",
     fullSaveDir: __dirname + "/documents/pdf/",
@@ -96,7 +105,7 @@ app.use(function (req, res, next) {
     next();
 });
 
-var queryCreatePdf = function (req, res, next) {
+const queryCreatePdf = function (req, res, next) {
     var cfg;
     var file;
     if (req.params.cfg) cfg = JSON.parse(req.params.cfg);
@@ -135,7 +144,7 @@ var queryCreatePdf = function (req, res, next) {
     }
 };
 
-var sendFile = function (fileName, response, userFilename) {
+const sendFile = function (fileName, response, userFilename) {
     const filePath = __dirname + fileName;
     var filename = '';
     if (userFilename)
@@ -159,7 +168,7 @@ var sendFile = function (fileName, response, userFilename) {
     });
 };
 
-var queryGetPdf = function (req, res, next) {
+const queryGetPdf = function (req, res, next) {
     var fileName = req.params.filename || '';
     var userFileName = req.params.customName;
     var dir = cfg.saveDir;
@@ -167,13 +176,12 @@ var queryGetPdf = function (req, res, next) {
     sendFile(path, res, userFileName);
 };
 
-function parseRequest(req) {
+const parseRequest = function (req) {
     if (!req._body) {
         console.log(new Date() + 'got url encode');
-        var form = new formidable.IncomingForm();
-        var formData;
-        return form;
-        form.parse(req, function (err, fields, files) {
+        const form = new formidable.IncomingForm();
+        let formData;
+        return form.parse(req, function (err, fields, files) {
             console.log('parsed', fields);
             formData = fields;
             return (formData);
@@ -183,7 +191,7 @@ function parseRequest(req) {
         console.log(new Date() + 'got formdata');
         return (req.body);
     }
-}
+};
 
 function implodePdfInDir(dirName, fileName, req, res) {
     var implodeResult;
@@ -218,7 +226,7 @@ function implodePdfInDir(dirName, fileName, req, res) {
 
                     };
                     delete formData['application'];
-                    request.post('http://php-weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
+                    request.post('http:/' + enviroment.weldbookUrl + '/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
                         if (err) {
                             console.log('Error!');
                             res.send('Error!');
@@ -261,7 +269,7 @@ function rimraf(dir_path) {
     console.log('delete ' + dir_path);
     if (fs.existsSync(dir_path)) {
         fs.readdirSync(dir_path).forEach(function (entry) {
-            var entry_path = path.join(dir_path, entry);
+            const entry_path = path.join(dir_path, entry);
             if (fs.lstatSync(entry_path).isDirectory()) {
                 rimraf(entry_path);
             } else {
@@ -272,7 +280,7 @@ function rimraf(dir_path) {
     }
 }
 
-var queryTestCreatePdf = function (req, res, next) {
+const queryTestCreatePdf = function (req, res, next) {
     var cfg;
     var file;
     console.log(new Date() + ' got request');
@@ -451,56 +459,209 @@ var queryTestCreatePdf = function (req, res, next) {
     // createPdf(parseRequest(req));
 };
 
+const checkCachesPdf = function (req, res, next) {
+    const target = 'http://' + enviroment.WBFUrl + '/op/op.SeparatedPdfStorage.php?command=isFileExist';
+    let form = {};
+    form.login = WBDriveData.login;
+    form.pwd = WBDriveData.pwd;
+    form.fileHash = req.query['fileHash'];
+    request.post(target, {formData: form}, (err, response, body) => {
+        res.send(body);
+        // console.log('body',body);
+    });
 
-var queryPdfPages = function (req, res, next) {
-    var gotFiles;
+};
+
+const addPdfToSeparatedCache = function (filePath, hash) {
+    let gotFiles;
+
+    // console.log(fields,files);
+    const tmpDir = 'cachesPdfs/' + new Date().getTime();
+    fs.mkdirSync(tmpDir);
+    fs.mkdirSync(tmpDir + '/pages');
+    const archive = archiver('zip', {
+        zlib: {level: 9} // Sets the compression level.
+    });
+    const output = fs.createWriteStream(tmpDir + '/example.zip');
+    // good practice to catch warnings (ie stat failures and other non-blocking errors)
+    archive.on('warning', function (err) {
+        if (err.code === 'ENOENT') {
+            // log warning
+        } else {
+            // throw error
+            throw err;
+        }
+    });
+// good practice to catch this error explicitly
+    archive.on('error', function (err) {
+        throw err;
+    });
+// pipe archive data to the file
+    archive.pipe(output);
+    pdftk
+        .input(filePath)
+        .burst(tmpDir + '/pages' + '/page_%02d.pdf')
+        .then(function (buffer) {
+                archive.directory(tmpDir + '/pages', false);
+                const test = archive.finalize();
+                const target = 'http://' + enviroment.WBFUrl + '/op/op.SeparatedPdfStorage.php?command=saveSeparatedPages';
+                test.then((archVar) => {
+                    fs.readFile(tmpDir + '/example.zip', (err, file) => {
+                        let ws = request.post(target, function (error, response, body) {
+                            console.log('server encoded the data as: ' + (response.headers['content-encoding'] || 'identity'));
+                            console.log('the decoded data is: ' + body);
+                            rimraf(tmpDir);
+                        });
+                        let form = ws.form();
+                        form.append('login', WBDriveData.login);
+                        form.append('pwd', WBDriveData.pwd);
+                        form.append('archiveHash', hash);
+                        form.append('pdfArchive', file, {filename: 'archive.zip'});
+                    });
+
+                });
+            }
+        ).catch(function (error) {
+        console.log({status: false, msg: error});
+    });
+
+};
+
+const queryPdfPages = function (req, res, next) {
+    let gotFiles;
     if (!req._body) {
-        console.log(new Date() + 'got url encode');
-        var form = new formidable.IncomingForm();
-        var formData;
+        console.log(new Date() + 'got request');
+        let form = new formidable.IncomingForm();
+        let formData;
         form.parse(req, function (err, fields, files) {
             // console.log(fields,files);
             formData = fields;
-            if (!formData.catParams){
+            if (!formData.catParams) {
                 res.send({status: false, msg: 'requestFail'});
                 return;
             }
             gotFiles = files;
-            pdftk
-                .input(gotFiles['userfile'].path)
-                .cat(formData.catParams)
-                .output('./donePdftkCat.pdf')
-                .then(function (buffer) {
-                    var cfgData = fields;
-                    // console.log('got sendToWBF Data', cfgData);
-                    if (cfgData.sendToWBF) {
-                        // console.log('got sendToWBF Data', cfgData.sendToWBF);
-                        var formData = cfgData;
-                        formData['userfile'] = {
-                            value: buffer,
-                            options: {
-                                filename: 'test1.pdf',
-                                contentType: 'application/pdf'
-                            }
-                        };
-                        for(var key in formData){if(formData[key]===null)delete formData[key]};
-                        request.post('http://weldbook.ru/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
-                            if (err) {
-                                console.log('Error!');
-                                res.send('Error!');
-                            } else {
-                                res.send(body);
-                            }
+            if (+formData.fileCached) {
+                const target = 'http://' + enviroment.WBFUrl + '/op/op.SeparatedPdfStorage.php?command=getFilePages';
+                let ws = request.post(target);
+                const entryes = [];
+                ws.pipe(unzip.Parse())
+                    .on('entry', (entry) => {
+                        const fileName = entry.path;
+                        const type = entry.type; // 'Directory' or 'File'
+                        const size = entry.size;
+                        const bufs = [];
+                        entry.on('data', function (d) {
+                            bufs.push(d);
                         });
+                        entry.on('end', function () {
+                            const buf = Buffer.concat(bufs);
+                            entryes.push(buf);
+                        });
+                        if (fileName === "this IS the file I'm looking for") {
+                            entry.pipe(fs.createWriteStream('output/path'));
+                        } else {
+                            entry.autodrain();
+                        }
+                    }).on('close', () => {
+                    // console.log(entryes);
+                    pdftk
+                        .input(entryes)
+                        .cat()
+                        .output()
+                        .then(function (buffer) {
+                            pdftk
+                                .input(buffer)
+                                .cat(formData.catParams)
+                                .output('./donePdftkCat.pdf')
+                                .then(function (buffer) {
+                                        let cfgData = fields;
+                                        // console.log('got sendToWBF Data', cfgData);
+                                        if (cfgData.sendToWBF) {
+                                            // console.log('got sendToWBF Data', cfgData.sendToWBF);
+                                            let formData = cfgData;
+                                            formData['userfile'] = {
+                                                value: buffer,
+                                                options: {
+                                                    filename: 'test1.pdf',
+                                                    contentType: 'application/pdf'
+                                                }
+                                            };
+                                            for (let key in formData) {
+                                                if (formData[key] === null) delete formData[key]
+                                            }
+                                            request.post('http://' + enviroment.weldbookUrl + '/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
+                                                if (err) {
+                                                    console.log('Error!');
+                                                    res.send('Error!');
+                                                } else {
+                                                    res.send(body);
+                                                }
+                                            });
+                                        }
+                                        else
+                                        {
+                                            // res.download('./donePdftkCat.pdf', 'test.pdf');
+                                            res.setHeader('Content-disposition', 'attachment; filename=' + 'test.pdf');
+                                            res.setHeader('Content-type', 'application/pdf');
+                                            res.send(buffer);
+                                        }
+                                    }
+                                ).catch(function (error) {
+                                res.send({status: false, msg: error});
+                            });
+                            }
+                        ).catch(function (error) {
+                        res.send({status: false, msg: error});
+                    });
+                });
+                let form = ws.form();
+                form.append('login', WBDriveData.login);
+                form.append('pwd', WBDriveData.pwd);
+                form.append('fileHash', formData['fileHash']);
+                form.append('pages', formData['catParams']);
+            }
+            else {
+                console.log('FILE IS NO CACHED');
+                addPdfToSeparatedCache(gotFiles['userfile'].path, formData['fileHash']);
+                pdftk
+                    .input(gotFiles['userfile'].path)
+                    .cat(formData.catParams)
+                    .output('./donePdftkCat.pdf')
+                    .then(function (buffer) {
+                            let cfgData = fields;
+                            // console.log('got sendToWBF Data', cfgData);
+                            if (cfgData.sendToWBF) {
+                                // console.log('got sendToWBF Data', cfgData.sendToWBF);
+                                let formData = cfgData;
+                                formData['userfile'] = {
+                                    value: buffer,
+                                    options: {
+                                        filename: 'test1.pdf',
+                                        contentType: 'application/pdf'
+                                    }
+                                };
+                                for (let key in formData) {
+                                    if (formData[key] === null) delete formData[key]
+                                }
+                                request.post('http://' + enviroment.weldbookUrl + '/php/main.php?save=DestructiveTestingConclusionFilesToWBF', {formData: formData}, function (err, resp, body) {
+                                    if (err) {
+                                        console.log('Error!');
+                                        res.send('Error!');
+                                    } else {
+                                        res.send(body);
+                                    }
+                                });
+                            }
+                            else
+                                res.download('./donePdftkCat.pdf', gotFiles['userfile'].name);
+                        }
+                    ).catch(function (error) {
+                    res.send({status: false, msg: error});
+                });
+            }
 
-                    }
-                    else
-                    res.download('./donePdftkCat.pdf',gotFiles['userfile'].name);
-                    }
-                ).catch(function(error){
-                res.send({status: false, msg: error});
-                return;
-            });
+
         });
     }
     else {
@@ -511,14 +672,18 @@ app.post('/createPdf/:cfg?', queryCreatePdf);
 app.post('/testCreatePdf/:cfg?', queryTestCreatePdf);
 app.get('/testCreatePdf/:cfg?', queryTestCreatePdf);
 app.post('/getPdfPages/:cfg?', queryPdfPages);
+app.post('/addPdfToSeparatedCache/:cfg?', addPdfToSeparatedCache);
 app.get('/getPdfPages/:cfg?', queryPdfPages);
+app.get('/checkCachesPdf/:cfg?', checkCachesPdf);
+app.post('/checkCachesPdf/:cfg?', checkCachesPdf);
+app.get('/addPdfToSeparatedCache/:cfg?', addPdfToSeparatedCache);
 app.get('/createPdf/:cfg?', queryCreatePdf);
 app.get('/getPdf/:filename?/:customName?', queryGetPdf);
 
 server = http.listen(8080); // Запуск сервера.
 console.log("Сервер запущен http://localhost:" + 8080 + "/");
 
-var trashCollector = function () {
+const trashCollector = function () {
     var curDate = new Date();
     var delArray = [];
     var filesCount = cacheFiles.files.length;
@@ -547,7 +712,7 @@ var trashCollector = function () {
 
 setInterval(trashCollector, cfg.timer);
 
-var getFileFromList = function (hash) {
+const getFileFromList = function (hash) {
     var searchFileIndex = cacheFiles.files.findIndex(function (elem) {
         return hash == elem.hash
     });
@@ -559,12 +724,12 @@ var getFileFromList = function (hash) {
     return cacheFiles.files[searchFileIndex];
 };
 
-var addFileToList = function (time, hash, name, fileName, documentId) {
+const addFileToList = function (time, hash, name, fileName, documentId) {
     cacheFiles.files.push({"name": name, "time": time, "hash": hash, "filename": fileName, "documentId": documentId});
     updateCache();
 };
 
-var PdfCreator = function (cfg) {
+const PdfCreator = function (cfg) {
     var pdfCreator = this;
     pdfCreator.init(cfg);
 };
