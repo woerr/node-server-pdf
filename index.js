@@ -117,7 +117,7 @@ const queryCreatePdf = function (req, res, next) {
     var file;
     if (req.params.cfg) cfg = JSON.parse(req.params.cfg);
     var pdfCreator = new PdfCreator();
-    var createPdf = function (reqData) {le
+    var createPdf = function (reqData) {
         var creatorCfg = reqData;
         var cryptCfg = sha256(JSON.stringify(creatorCfg));// hash Конфига
         if (false){
