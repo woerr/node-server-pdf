@@ -1,9 +1,16 @@
+const fs = require('fs');
+
+const httpsOptions = {
+	cert: fs.readFileSync('./fullchain.pem'),
+	key: fs.readFileSync('./privkey.pem')
+};
+
 const app = require('express')(),
     bodyParser = require('body-parser'),
     mkdirp = require('mkdirp'),
     http = require('http').Server(app),
+    https = require('https')	
     unzip = require('unzip'),
-    fs = require('fs'),
     request = require('request'),
     wkhtmltopdf = require('wkhtmltopdf'),
     sha256 = require('sha256'),
@@ -97,7 +104,7 @@ const cfg = {
 // };
 // app.use(formDataParse);
 app.use(bodyParser.urlencoded({extended: true, limit: '100mb'})); // for parsing application/x-www-form-urlencoded
-app.use(bodyParser.json()); // for parsing application/json
+app.use(bodyParser.json({limit: '50mb'})); // for parsing application/json
 
 app.use(function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
@@ -113,7 +120,7 @@ const queryCreatePdf = function (req, res, next) {
     var createPdf = function (reqData) {
         var creatorCfg = reqData;
         var cryptCfg = sha256(JSON.stringify(creatorCfg));// hash Конфига
-        if (file = getFileFromList(cryptCfg)) {
+        if (false){
             // console.log('Cache is working - '+file.name);
             res.redirect(req.protocol + '://' + req.get('host') + '/getPdf/' + path.basename(file.name) + ((cfg && cfg.userFilename) ? ('/' + cfg.userFilename) : ''));
         }
@@ -147,6 +154,7 @@ const queryCreatePdf = function (req, res, next) {
 const sendFile = function (fileName, response, userFilename) {
     const filePath = __dirname + fileName;
     var filename = '';
+	console.log('sendfile: ' + fileName + ' / ' + userFilename);
     if (userFilename)
         filename = userFilename;
     else
@@ -156,10 +164,14 @@ const sendFile = function (fileName, response, userFilename) {
         if (exists) {
             // Content-type is very interesting part that guarantee that
             // Web browser will handle response in an appropriate manner.
-            response.writeHead(200, {
-                "Content-Disposition": "inline; filename=\"" + filename + "\"",
-                "Location": server.address() + filePath
-            });
+	     response.statusCode = 200;
+      		response.setHeader('location', server.address() + filePath);
+      		response.setHeader('Content-Disposition', "inline; filename=\"" + encodeURI(filename) + "\"");
+      		response.flushHeaders();
+           // /*response.writeHead(200, {
+             //   "Content-Disposition": "inline; filename=\"" + filename + "\"",
+            //    "Location": server.address() + filePath
+            //});*/
             fs.createReadStream(filePath).pipe(response);
         } else {
             response.writeHead(400, {"Content-Type": "text/plain"});
@@ -681,6 +693,8 @@ app.get('/createPdf/:cfg?', queryCreatePdf);
 app.get('/getPdf/:filename?/:customName?', queryGetPdf);
 
 server = http.listen(8080); // Запуск сервера.
+https.createServer(httpsOptions,app).listen(8443);
+
 console.log("Сервер запущен http://localhost:" + 8080 + "/");
 
 const trashCollector = function () {
